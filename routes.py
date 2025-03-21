@@ -163,6 +163,27 @@ def get_questions_by_difficulty(category, difficulty):
 def normalize_answer(answer):
     return " ".join(answer.strip().lower().split())
 
+@app.route('/trivia/questions/<int:question_id>/hints', methods=['GET'])
+def get_hints(question_id):
+    question = TriviaQuestion.query.get(question_id)
+    if not question:
+        return jsonify({'error': 'Question not found'}), 404
+
+    answer_words = question.answer.split()
+    word_count = len(answer_words)
+    first_letters = ", ".join([word[0] for word in answer_words])
+    last_letters = ", ".join([word[-1] for word in answer_words])
+    
+    hint_str = f"The answer consists of {word_count} word{'s' if word_count != 1 else ''}. " \
+               f"The first letter{' is' if word_count == 1 else 's are'}: {first_letters}; " \
+               f"the last letter{' is' if word_count == 1 else 's are'}: {last_letters}."
+    
+    return jsonify({
+        'question': question.question,
+        'word_count': word_count,
+        'hint': hint_str
+    })
+
 @app.route('/trivia/questions/<int:question_id>/answer', methods=['POST'])
 def submit_single_answer(question_id):
     data = request.json
@@ -523,25 +544,15 @@ def get_all_feedback():
     } for fb in feedbacks]
     return jsonify({"feedback": feedback_data})
 
-@app.route('/trivia/feedback', methods=['DELETE'])
-@jwt_required()
-def delete_all_feedback():
-    user_id = get_jwt_identity()
-    feedbacks = Feedback.query.filter_by(user_id=user_id).all()
-    if not feedbacks:
-        return jsonify({'message': 'No feedback to delete'}), 404
-    for fb in feedbacks:
-        db.session.delete(fb)
-    db.session.commit()
-    return jsonify({'message': 'All feedback deleted successfully'})
-
 @app.route('/trivia/feedback/<int:feedback_id>', methods=['DELETE'])
 @jwt_required()
 def delete_feedback(feedback_id):
-    user_id = get_jwt_identity()
-    feedback = Feedback.query.filter_by(id=feedback_id, user_id=user_id).first()
+    user_id = int(get_jwt_identity())  
+    feedback = Feedback.query.get(feedback_id)
     if not feedback:
         return jsonify({'error': 'Feedback not found'}), 404
+    if feedback.user_id != user_id:
+        return jsonify({'error': 'Unauthorized: You can only delete your own feedback'}), 403
     db.session.delete(feedback)
     db.session.commit()
     return jsonify({'message': f'Feedback {feedback_id} deleted successfully'})
