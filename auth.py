@@ -39,7 +39,7 @@ def login():
     if not user or not bcrypt.check_password_hash(user.password, password):
         return jsonify({'error': 'Invalid username or password'}), 401
     access_token = create_access_token(identity=str(user.id))
-    notifications = Notification.query.filter_by(user_id=user.id).all()
+    notifications = Notification.query.filter_by(user_id=user.id, read=False).all()
     notification_list = []
     known_categories = ["science", "sports", "history", "entertainment", "geography"]
     for notif in notifications:
